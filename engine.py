@@ -101,6 +101,8 @@ def normalize_matches(df: pd.DataFrame, tour: str="ATP") -> pd.DataFrame:
     score=_col(df,'score','Score','resultado')
     bo=_col(df,'best_of','Best of','bestof')
     comment=_col(df,'Comment','comment')
+    rank_w=_col(df,'winner_rank')
+    rank_l=_col(df,'loser_rank')
     missing=[name for name,key in [('winner/ganador',w),('loser/perdedor',l),('Date/tourney_date',date),('surface',surf)] if key is None]
     if missing:
         raise DataError("Faltan columnas: " + ', '.join(missing))
@@ -112,6 +114,8 @@ def normalize_matches(df: pd.DataFrame, tour: str="ATP") -> pd.DataFrame:
         'score':df[score].astype(str) if score is not None else _score_from_sets(df),
         'tour':str(tour).upper(),
         'best_of':pd.to_numeric(df[bo], errors='coerce') if bo else 3,
+        'winner_rank':pd.to_numeric(df[rank_w], errors='coerce') if rank_w else np.nan,
+        'loser_rank':pd.to_numeric(df[rank_l], errors='coerce') if rank_l else np.nan,
     })
     if comment is not None:
         rejected=df[comment].astype(str).str.contains('retired|walkover|unfinished|abandoned|default',case=False,regex=True)
