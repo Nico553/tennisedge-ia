@@ -15,6 +15,7 @@ import streamlit as st
 from odds_feed import OddsFeedError,tennis_tournaments,fetch_tournament,flatten_odds,summarize_prices,available_key
 from live_scores import TennisLiveError,live_key_available,fetch_live,fetch_fixtures
 from value_panel import render_value_panel
+from portfolio_panel import render_portfolio_panel
 
 CHILE=ZoneInfo('America/Santiago')
 
@@ -45,15 +46,17 @@ st.markdown('''<style>
 .stButton>button[kind="primary"]{background:#d8fb69;color:#132018}
 </style>''',unsafe_allow_html=True)
 
-st.caption('TennisEdge IA 3.0 · DATOS ACTUALES Y MOTOR DE VALOR EXPERIMENTAL · CHILE')
-st.title('🎾 TennisEdge · Escáner de valor')
-st.write('Detecta discrepancias entre **precios publicados por casas** y modelos históricos calibrados. Sin filtros arbitrarios de cuota; no se confunde valor teórico con rentabilidad demostrada.')
+st.caption('TennisEdge IA 4.0 · ESCÁNER GLOBAL DE TENIS · CHILE')
+st.title('🎾 TennisEdge · Señales multitorneo')
+st.write('Revisa competiciones ATP/WTA y otros torneos disponibles, busca discrepancias entre cuotas y probabilidades históricas y descarta señales poco respaldadas. **Sin notificaciones y sin apuestas automáticas**.')
 st.caption('Los precios son de casas externas, **no son cuotas de Betano Chile**. Datos actualizados según la hora que informe cada proveedor.')
 
 if not available_key():
     st.error('Falta THE_ODDS_API_KEY en Render. Abre Environment y guarda la clave de The Odds API como variable privada.')
     st.markdown('[Administrar Render](https://dashboard.render.com/web/srv-dbb3g9mi0phs73bc97tg)')
 else:
+    render_portfolio_panel()
+    st.divider()
     @st.fragment(run_every='30m')
     def current_odds_panel():
         st.subheader('💹 Cuotas automáticas · ATP / WTA')
@@ -109,7 +112,9 @@ else:
             st.error(str(e))
         except Exception:
             st.error('No se pudieron cargar las cuotas. Comprueba la clave y la cobertura del torneo en The Odds API.')
-    current_odds_panel()
+    with st.expander('🔎 Explorar un torneo manualmente (opcional; consume créditos adicionales)'):
+        if st.toggle('Activar consulta individual',value=False,key='single_tournament_opt_in'):
+            current_odds_panel()
 
 st.divider()
 st.subheader('🔴 Marcadores y estadísticas en juego')
