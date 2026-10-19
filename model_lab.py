@@ -15,6 +15,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, brier_score_loss, log_loss, roc_auc_score
+from sklearn.isotonic import IsotonicRegression
 
 FEATURES=['elo_diff','overall_diff','recent_form_diff','surf_recent_diff','experience_diff',
           'log_matches_a','log_matches_b','log_surface_a','log_surface_b',
@@ -47,6 +48,7 @@ class ChronologicalLab:
         self.states:Dict[tuple,State]={}
         self.examples=self._build_features()
         self.trained={}
+        self.calibrators={}
         self.selected=None
         self.scoreboard=None
         self.market_metrics=None
@@ -175,8 +177,13 @@ class ChronologicalLab:
                 pv=model.predict_proba(xval)[:,1]
                 pt=model.predict_proba(xte)[:,1]
                 classifiers[name]=model
+            # Isotonic fitted only on validation; independent chronological test
+            # evaluates the calibrated predictions with no test-set feedback.
+            cal=IsotonicRegression(out_of_bounds='clip',y_min=0.001,y_max=0.999)
+            cal.fit(pv,yval)
+            self.calibrators[name]=cal
             validation.append({'Modelo':name,**self._metrics(yval,pv)})
-            scores.append({'Modelo':name,**self._metrics(yte,pt)})
+            scores.append({'Modelo':name,**self._metrics(yte,cal.predict(pt))})
         v=pd.DataFrame(validation).sort_values('Brier ↓')
         chosen=str(v.iloc[0].Modelo)
         self.selected=chosen
@@ -223,7 +230,8 @@ class ChronologicalLab:
         base=1/(1+10**(-(sa.rating(surface)-sb.rating(surface))/400))
         out={}
         for name in ('Elo por superficie','Regresión logística','Random Forest','Gradient Boosting'):
-            out[name]=float(base if name=='Elo por superficie' else self.trained[name].predict_proba(x)[0,1])
+            raw=float(base if name=='Elo por superficie' else self.trained[name].predict_proba(x)[0,1])
+            out[name]=float(self.calibrators[name].predict([raw])[0])
         for market in ('A gana ≥1 set','A −2,5 juegos','Más de 22,5 juegos'):
             out[market]=float(self.trained[market].predict_proba(x)[0,1])
         return {'probabilities':out,'details':{

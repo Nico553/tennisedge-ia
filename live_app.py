@@ -14,6 +14,7 @@ import streamlit as st
 
 from odds_feed import OddsFeedError,tennis_tournaments,fetch_tournament,flatten_odds,summarize_prices,available_key
 from live_scores import TennisLiveError,live_key_available,fetch_live,fetch_fixtures
+from value_panel import render_value_panel
 
 CHILE=ZoneInfo('America/Santiago')
 
@@ -44,9 +45,9 @@ st.markdown('''<style>
 .stButton>button[kind="primary"]{background:#d8fb69;color:#132018}
 </style>''',unsafe_allow_html=True)
 
-st.caption('TennisEdge IA · INFORMACIÓN DE TENIS ACTUAL · CHILE')
-st.title('🎾 Partidos y cuotas actuales')
-st.write('Consulta automática de **precios publicados por casas de apuestas**, partidos programados y, con un segundo proveedor, marcadores en juego.')
+st.caption('TennisEdge IA 3.0 · DATOS ACTUALES Y MOTOR DE VALOR EXPERIMENTAL · CHILE')
+st.title('🎾 TennisEdge · Escáner de valor')
+st.write('Detecta discrepancias entre **precios publicados por casas** y modelos históricos calibrados. Sin filtros arbitrarios de cuota; no se confunde valor teórico con rentabilidad demostrada.')
 st.caption('Los precios son de casas externas, **no son cuotas de Betano Chile**. Datos actualizados según la hora que informe cada proveedor.')
 
 if not available_key():
@@ -98,6 +99,8 @@ else:
                 'mejor_cuota':'Mejor cuota','mejor_casa':'Casa','casas':'N.º casas',
                 'consenso_sin_margen_pct':'Consenso sin margen %','actualizacion_reciente':'Hora de cotización UTC'})
             cols=['Hora Chile','Partido','Estado por horario','Mercado','Selección','Línea','Mejor cuota','Casa','N.º casas','Hora de cotización UTC']
+            render_value_panel(raw,choice[label],label,max_age=maxage)
+            st.markdown('##### Todas las cuotas observadas (sin restricción de cuotas)')
             st.dataframe(summ[cols],hide_index=True,width='stretch')
             st.download_button('Descargar precios reales (CSV)',summ.to_csv(index=False).encode('utf-8-sig'),
                 file_name='tennisedge_cuotas_actuales.csv',mime='text/csv')
@@ -149,7 +152,7 @@ else:
 
 st.divider()
 with st.expander('🧠 Modelos históricos y predicciones experimentales'):
-    st.write('El motor Elo, regresión logística, Random Forest y Gradient Boosting está disponible en **Laboratorio histórico** desde el menú lateral.')
+    st.write('El laboratorio permite estudiar Elo, regresión logística, Random Forest y Gradient Boosting con particiones cronológicas. El escáner está arriba y se activa al aceptar el uso no comercial del archivo histórico.')
     st.warning('El conjunto histórico actual termina en mayo de 2026. No debemos convertir sus probabilidades en recomendaciones de partidos de octubre sin incorporar resultados recientes, calibrar y validar de nuevo.')
 
 st.caption('TennisEdge IA es una herramienta de investigación. No ofrece cuotas verificadas de Betano, no realiza apuestas y no garantiza resultados.')
