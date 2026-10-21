@@ -21,7 +21,7 @@ _SURFACE_RULES = {
              'cincinnati','canadian open','toronto','montreal','shanghai masters',
              'paris masters','paris indoor','vienna','basel','beijing','tokyo',
              'stockholm','rotterdam','doha','dubai','acapulco','washington','almaty',
-             'brussels','european open','grand prix auvergne rhone alpes',
+             'brussels','european open','ningbo open','grand prix auvergne rhone alpes',
              'brisbane','auckland','adelaide','seoul','osaka','wuhan'),
     'Clay': ('french open','roland garros','monte carlo','madrid open','mutua madrid',
              'italian open','internazionali bnl','rome masters','rome open',

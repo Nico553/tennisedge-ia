@@ -11,15 +11,10 @@ import os
 
 import pandas as pd
 import streamlit as st
-from rapid_tennis import (available,get_upcoming,get_recent_results,
-                          parse_upcoming,parse_recent_results,RapidTennisError)
+from rapid_tennis import (available,get_recent_results,parse_recent_results,RapidTennisError)
+from rapid_catalog import current_rapid_catalog
 
 CHILE=ZoneInfo('America/Santiago')
-
-@st.cache_data(ttl=12*3600,show_spinner='Consultando partidos de diferentes torneos…')
-def upcoming_cached(fingerprint:str):
-    matches, metadata = get_upcoming(max_pages=2)
-    return matches, metadata, datetime.now(timezone.utc)
 
 @st.cache_data(ttl=12*3600,show_spinner='Comprobando resultados recientes ATP y WTA…')
 def recent_cached(fingerprint:str,start:str,end:str):
@@ -42,10 +37,9 @@ if not available():
     st.page_link('live_app.py',label='Ir a cuotas y escáner actuales',icon='📡')
     st.stop()
 
-fingerprint=sha256(os.environ['RAPIDAPI_TENNIS_KEY'].encode()).hexdigest()[:16]
+fingerprint=sha256(os.environ['RAPIDAPI_TENNIS_KEY'].strip().encode()).hexdigest()[:16]
 try:
-    incoming,meta,checked=upcoming_cached(fingerprint)
-    frame=parse_upcoming(incoming,retrieved_at=checked)
+    frame,meta,checked=current_rapid_catalog()
 except RapidTennisError as exc:
     st.error(str(exc))
     st.page_link('live_app.py',label='Continuar con The Odds API',icon='📡')

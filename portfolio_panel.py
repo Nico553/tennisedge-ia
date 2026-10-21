@@ -20,6 +20,8 @@ from multitour_engine import (
     enrich_candidates,propose_combinations,
 )
 from value_panel import get_calibrated_model
+from rapid_tennis import available as rapid_available, RapidTennisError
+from rapid_catalog import current_rapid_catalog
 
 
 def key_hash()->str:
@@ -40,7 +42,43 @@ def snapshot_cached(slot:int,token_hash:str):
 
 def render_portfolio_panel():
     st.subheader('🌐 Escáner automático · múltiples torneos')
-    st.caption('Vista global sin configurar torneos. Revisa hasta cinco competiciones rotativas cada 12 horas, con cuotas de ganador de partido en casas EU. No rastrea todas las ligas a la vez ni revisa continuamente con la web cerrada.')
+    st.caption('Cobertura conjunta ATP, WTA y torneos inferiores cuando la fuente los informa. Solo The Odds API ofrece cuotas con hora de actualización para el escáner estadístico actual; RapidAPI amplía el catálogo, pero sus precios no se usan como señales confirmadas.')
+    # La consulta de RapidAPI comparte la misma caché de 6h con su página propia.
+    # No se envían solicitudes adicionales al pasar entre ambas páginas.
+    st.markdown('#### 🌍 Torneos disponibles en la segunda fuente')
+    if not rapid_available():
+        st.info('RapidAPI aún no está configurada. Abre «Multitorneo: segunda fuente» para ver los pasos; el escáner de cuotas original sigue disponible.')
+    else:
+        try:
+            rapid_frame, rapid_meta, rapid_checked = current_rapid_catalog()
+        except RapidTennisError as exc:
+            st.warning(f'Segunda fuente: {exc}. El análisis con The Odds API permanece independiente.')
+        except Exception:
+            st.warning('No fue posible leer el catálogo de RapidAPI. El escáner principal continúa con The Odds API.')
+        else:
+            if rapid_frame.empty:
+                st.info('RapidAPI no publicó partidos individuales futuros en las páginas consultadas. No se simulan torneos.')
+            else:
+                rt = int(rapid_frame[['Torneo', 'Categoría']].drop_duplicates().shape[0])
+                rmatch = len(rapid_frame)
+                rquoted = int(rapid_frame[['Cuota A', 'Cuota B']].notna().all(axis=1).sum())
+                u,v,x = st.columns(3)
+                u.metric('Torneos de RapidAPI', rt)
+                v.metric('Partidos programados RapidAPI', rmatch)
+                x.metric('Partidos con precios sin validar', rquoted)
+                st.caption('Datos de RapidAPI consultados el '+rapid_checked.strftime('%d-%m %H:%M')+' UTC. Estos números no representan señales evaluadas por el modelo.')
+                if rapid_meta.get('more_pages'):
+                    st.warning('Catálogo incompleto: hay más páginas en el proveedor. Se consultaron solo dos para respetar el plan gratuito.')
+                groups=(rapid_frame.groupby('Categoría',dropna=False)
+                    .agg(Torneos=('Torneo','nunique'),Partidos=('Torneo','size')).reset_index())
+                st.dataframe(groups,hide_index=True,width='stretch')
+                with st.expander('📅 Ver partidos y torneos adicionales (sin señales aprobadas)'):
+                    show=rapid_frame[['Torneo','Categoría','Superficie','Inicio UTC','Jugador A','Jugador B','Cuota A','Cuota B']].copy()
+                    show=show.rename(columns={'Inicio UTC':'Inicio (UTC)', 'Cuota A':'Precio A sin validar', 'Cuota B':'Precio B sin validar'})
+                    st.dataframe(show,hide_index=True,width='stretch')
+                    st.caption('La API secundaria no garantiza el timestamp de sus precios. La ausencia de hora de cotización impide calcular señales de valor fiables con ellos.')
+    st.divider()
+    st.markdown('#### 💹 Mercados de cuotas verificables · The Odds API')
     if not available_key():
         st.error('Falta THE_ODDS_API_KEY en Environment de Render.')
         return
@@ -54,12 +92,12 @@ def render_portfolio_panel():
     quoted=int(raw.event_id.nunique()) if not raw.empty else 0
     a,b,c=st.columns(3)
     eligible_count=sum(tournament_category(t)!='Excluido (dobles)' and t.get('active') for t in catalog)
-    a.metric('Competiciones elegibles',eligible_count)
+    a.metric('Torneos activos The Odds API',eligible_count)
     b.metric('Consultadas en este ciclo',consulted)
     c.metric('Partidos con cuotas',quoted)
     st.caption(f"Última consulta real: {checked_at.strftime('%d-%m %H:%M')} UTC · Región: EU · Créditos restantes reportados: {remaining if remaining is not None else 'no disponible'} · Reserva: {RESERVE_CREDITS} créditos.")
     if eligible_count>len(selected):
-        st.info(f'Se consultaron hasta {len(selected)} de {eligible_count} torneos elegibles. Los demás quedan pendientes para futuras rotaciones a fin de conservar la cuota de API. Esto es cobertura parcial, no un escaneo exhaustivo.')
+        st.info(f'The Odds API ofreció {eligible_count} torneos activos; consultamos hasta {len(selected)} en este ciclo. Los otros torneos de RapidAPI aparecen arriba, pero todavía no generan señales validadas.')
     if coverage:
         with st.expander('📋 Competiciones realmente consultadas y estado'):
             st.dataframe(pd.DataFrame(coverage),hide_index=True,width='stretch')
