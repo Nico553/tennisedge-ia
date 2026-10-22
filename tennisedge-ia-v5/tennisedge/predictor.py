@@ -81,7 +81,7 @@ class Predictor:
         if df is None or df.empty:
             return
         df = df[pd.to_datetime(df['date']) > pd.Timestamp(self.archive_last)].sort_values('date')
-        logs, kept = [], []
+        logs, kept, feats = [], [], []
         for r in df.to_dict('records'):
             if str(r.get('retired')).lower() in ('true', '1') or not r.get('surface'):
                 continue
@@ -97,11 +97,12 @@ class Predictor:
             pw = self.engine.player(tour, w, lvl); pl = self.engine.player(tour, l, lvl)
             bo = int(r.get('best_of') or 3)
             seasoned = pw.n >= 5 and pl.n >= 5
+            # Características con el estado PREVIO (A = ganador); el modelo se evalúa al final,
+            # todo junto y vectorizado, porque no influye en la actualización de los ratings.
             f = self.engine.features(tour, pw, pl, r['surface'], t, bo)
-            f['p_markov'] = float(markov.match_win(f['pa'], f['pb'], bo))
-            p = float(self.model.predict_sym(feature_frame(pd.DataFrame([f])).to_numpy())[0])
+            feats.append(f)
             logs.append({'date': r['date'], 'tour': tour, 'level': lvl, 'winner': w, 'loser': l,
-                         'p_winner': p, 'p_elo_winner': f['p_elo'], 'odds_w': r.get('odds_w'),
+                         'p_elo_winner': f['p_elo'], 'odds_w': r.get('odds_w'),
                          'odds_l': r.get('odds_l'), 'seasoned': seasoned})
             self.engine.update(tour, w, l, r['surface'], lvl, t, None, None, None, f['p_elo'],
                                games=(sc['w_games'], sc['l_games']))
@@ -109,6 +110,16 @@ class Predictor:
             kept.append({**r, 'winner': w, 'loser': l})
         self.recent = pd.DataFrame(kept)
         self.oos = pd.DataFrame(logs)
+        if feats:
+            fd = pd.DataFrame(feats)
+            bo = np.where(fd['bo5'] == 1, 5, 3)
+            pm = np.empty(len(fd))
+            for b_ in (3, 5):
+                m = bo == b_
+                if m.any():
+                    pm[m] = markov.match_win(fd['pa'].to_numpy()[m], fd['pb'].to_numpy()[m], b_)
+            fd['p_markov'] = pm
+            self.oos['p_winner'] = self.model.predict_sym(feature_frame(fd).to_numpy())
         self._reindex()
 
     # ------------------------------------------------------------ predicción
