@@ -11,6 +11,8 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
+    env:
+      RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
     defaults:
       run:
         working-directory: tennisedge-ia-v5
@@ -25,8 +27,12 @@ jobs:
           RAPIDAPI_TENNIS_KEY: ${{ secrets.RAPIDAPI_TENNIS_KEY }}
         run: python scripts/update_results.py --budget 40
       - name: Guardar en el repositorio
+        id: save
         run: |
           git config user.name "tennisedge-bot"
           git config user.email "tennisedge-bot@users.noreply.github.com"
           git add data/recent_results.csv data/recent_progress.json 2>/dev/null || true
-          if git diff --cached --quiet; then echo "Sin cambios"; else git commit -m "Resultados recientes $(date -u +%F)" && git push; fi
+          if git diff --cached --quiet; then echo "Sin cambios"; else git commit -m "Resultados recientes $(date -u +%F)" && git push && echo "changed=1" >> "$GITHUB_OUTPUT"; fi
+      - name: Publicar en Render (si hay datos nuevos)
+        if: steps.save.outputs.changed == '1' && env.RENDER_HOOK != ''
+        run: curl -fsS -X POST "$RENDER_HOOK" > /dev/null && echo "Despliegue solicitado a Render"
